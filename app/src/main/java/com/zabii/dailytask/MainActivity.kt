@@ -9,6 +9,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -46,8 +49,8 @@ import java.util.*
 
 data class TaskItem(val id: Long, val title: String, var done: Boolean = false)
 
-private const val CURRENT_VERSION_CODE = 6
-private const val CURRENT_VERSION_NAME = "1.5"
+private const val CURRENT_VERSION_CODE = 7
+private const val CURRENT_VERSION_NAME = "1.6"
 private const val VERSION_URL = "https://maryanrajput72-bot.github.io/daily-task/version.json"
 
 private val PinkBar = Color(0xFFFCE7F1)
@@ -257,7 +260,10 @@ fun AppShell() {
 
 @Composable
 fun SettingsPage(state: UpdateUiState, onCheck: () -> Unit, onUpdate: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(20.dp)) {
+    Column(
+        Modifier.fillMaxSize().padding(20.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
         Text("Settings", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1C2333))
         Spacer(Modifier.height(18.dp))
         Card(
@@ -314,6 +320,73 @@ fun SettingsPage(state: UpdateUiState, onCheck: () -> Unit, onUpdate: () -> Unit
                     fontSize = 12.sp, color = Color.Gray
                 )
             }
+        }
+        Spacer(Modifier.height(16.dp))
+        SnakeSettingsCard()
+    }
+}
+
+@Composable
+fun SnakeSettingsCard() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("snake_game", 0) }
+    var speed by remember { mutableStateOf(prefs.getString("speed", "MEDIUM") ?: "MEDIUM") }
+    var colorIdx by remember { mutableStateOf(prefs.getInt("colorIdx", 0).coerceIn(0, SnakeColors.lastIndex)) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text("Snake Game", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text("Speed", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF1C2333))
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, label) in listOf("CLASSIC" to "Classic", "MEDIUM" to "Medium", "HIGH" to "High")) {
+                    FilterChip(
+                        selected = speed == value,
+                        onClick = {
+                            speed = value
+                            prefs.edit().putString("speed", value).apply()
+                        },
+                        label = { Text(label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFC8E6C9),
+                            selectedLabelColor = Color(0xFF1B5E20)
+                        )
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Snake Color", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF1C2333))
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SnakeColors.forEachIndexed { idx, cs ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(cs.main)
+                                .border(
+                                    width = if (idx == colorIdx) 3.dp else 0.dp,
+                                    color = if (idx == colorIdx) Color(0xFF1C2333) else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    colorIdx = idx
+                                    prefs.edit().putInt("colorIdx", idx).apply()
+                                }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(cs.name, fontSize = 11.sp, color = if (idx == colorIdx) Color(0xFF1C2333) else Color.Gray,
+                            fontWeight = if (idx == colorIdx) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Speed aur color game me foran lag jaye ga.", fontSize = 12.sp, color = Color.Gray)
         }
     }
 }
@@ -432,149 +505,112 @@ fun PlaceholderPage(item: NavEntry) {
 
 @Composable
 fun HomeContent(tasks: MutableList<TaskItem>, updateState: UpdateUiState, onOpenSnake: () -> Unit) {
-    val doneCount = tasks.count { it.done }
-    val today = remember { SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.ENGLISH).format(Date()) }
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    val greeting = when (hour) {
-        in 5..11 -> "Good Morning"
-        in 12..16 -> "Good Afternoon"
-        in 17..21 -> "Good Evening"
-        else -> "Good Night"
-    }
-
-    LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF4F7CFF), Color(0xFF7B61FF))))
-                    .padding(start = 22.dp, end = 22.dp, top = 30.dp, bottom = 28.dp)
+    // Home pe SIRF ek sab se bara Snake card - baaki sab gayab (uska order)
+    Column(Modifier.fillMaxSize().padding(18.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth().weight(1f).clickable { onOpenSnake() },
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(Color(0xFF2E7D32), Color(0xFF43A047), Color(0xFF66BB6A))))
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column {
-                    Text(greeting, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
-                    Text("Daily Task", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(today, color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
-                }
-            }
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-            ) {
-                Column(Modifier.padding(18.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Today's Progress", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                        Text("$doneCount / ${tasks.size} done", color = BluePrimary, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    LinearProgressIndicator(
-                        progress = { if (tasks.isEmpty()) 0f else doneCount.toFloat() / tasks.size },
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)),
-                        color = BluePrimary, trackColor = Color(0xFFE3E9F7)
+                Spacer(Modifier.height(10.dp))
+                // Bara maze wala 3D-look sanp (smooth jism, koi dabe hisse nahi)
+                androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(240.dp)) {
+                    val w = size.width
+                    val h = size.height
+                    val pts = listOf(
+                        Offset(w * 0.10f, h * 0.78f),
+                        Offset(w * 0.28f, h * 0.52f),
+                        Offset(w * 0.44f, h * 0.74f),
+                        Offset(w * 0.58f, h * 0.48f),
+                        Offset(w * 0.72f, h * 0.62f)
                     )
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(pts[0].x, pts[0].y)
+                        for (p in pts.drop(1)) lineTo(p.x, p.y)
+                    }
+                    val bw = h * 0.17f
+                    drawPath(path, Color.Black.copy(alpha = 0.20f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = bw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    drawPath(path, Color(0xFF1B5E20),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = bw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    drawPath(path, Color(0xFF43A047),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = bw * 0.84f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    val lightPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(pts[0].x, pts[0].y - bw * 0.16f)
+                        for (p in pts.drop(1)) lineTo(p.x, p.y - bw * 0.16f)
+                    }
+                    drawPath(lightPath, Color(0xFFA5D6A7).copy(alpha = 0.6f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = bw * 0.26f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    // Sar
+                    val head = Offset(w * 0.82f, h * 0.44f)
+                    val hr = h * 0.16f
+                    drawCircle(Color.Black.copy(alpha = 0.2f), hr, Offset(head.x, head.y + 6f))
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFA5D6A7), Color(0xFF43A047), Color(0xFF1B5E20)),
+                            center = Offset(head.x - hr * 0.35f, head.y - hr * 0.35f),
+                            radius = hr * 1.7f
+                        ),
+                        radius = hr, center = head
+                    )
+                    // Zuban
+                    drawLine(Color(0xFFE53935), Offset(head.x + hr * 0.9f, head.y + hr * 0.1f), Offset(head.x + hr * 1.45f, head.y + hr * 0.16f), strokeWidth = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(Color(0xFFE53935), Offset(head.x + hr * 1.45f, head.y + hr * 0.16f), Offset(head.x + hr * 1.75f, head.y - hr * 0.08f), strokeWidth = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(Color(0xFFE53935), Offset(head.x + hr * 1.45f, head.y + hr * 0.16f), Offset(head.x + hr * 1.78f, head.y + hr * 0.38f), strokeWidth = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    // Aankhen
+                    for (s in listOf(-1f, 1f)) {
+                        val eyeC = Offset(head.x + hr * 0.25f, head.y - hr * 0.28f + s * hr * 0.34f)
+                        drawCircle(Color.White, hr * 0.23f, eyeC)
+                        drawCircle(Color(0xFF141414), hr * 0.12f, Offset(eyeC.x + hr * 0.06f, eyeC.y))
+                    }
+                    // Seb (apple)
+                    val ap = Offset(w * 0.16f, h * 0.18f)
+                    val ar = h * 0.10f
+                    drawCircle(Color.Black.copy(alpha = 0.2f), ar, Offset(ap.x, ap.y + 5f))
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFE57373), Color(0xFFC62828)),
+                            center = Offset(ap.x - ar * 0.3f, ap.y - ar * 0.3f),
+                            radius = ar * 1.5f
+                        ),
+                        radius = ar, center = ap
+                    )
+                    drawCircle(Color.White.copy(alpha = 0.5f), ar * 0.25f, Offset(ap.x - ar * 0.35f, ap.y - ar * 0.4f))
+                    drawOval(Color(0xFF2E7D32), topLeft = Offset(ap.x + ar * 0.1f, ap.y - ar * 1.35f), size = androidx.compose.ui.geometry.Size(ar * 0.8f, ar * 0.42f))
                 }
-            }
-            Text("My Tasks", modifier = Modifier.padding(start = 20.dp, bottom = 6.dp),
-                fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        item {
-            // Snake Game section - pyara green card, click pe game khulti hai
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clickable { onOpenSnake() },
-                shape = RoundedCornerShape(20.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(Brush.horizontalGradient(listOf(Color(0xFF43A047), Color(0xFF7CB342))))
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Spacer(Modifier.height(8.dp))
+                Text("Snake Plus", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Nokia wali game - ab 3D style me",
+                    color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp
+                )
+                Text(
+                    "Fruit khao, lamba ho - nevle se bacho!",
+                    color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp
+                )
+                Spacer(Modifier.weight(1f))
+                Box(
+                    modifier = Modifier.clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .padding(horizontal = 44.dp, vertical = 13.dp)
                 ) {
-                    // Chhota 3D-look sanp (gol hisse + chamak + aankh)
-                    androidx.compose.foundation.Canvas(Modifier.size(64.dp)) {
-                        val r = size.minDimension / 2f
-                        drawCircle(Color.White.copy(alpha = 0.25f), r, center)
-                        val pts = listOf(
-                            Offset(size.width * 0.28f, size.height * 0.68f),
-                            Offset(size.width * 0.42f, size.height * 0.45f),
-                            Offset(size.width * 0.58f, size.height * 0.62f)
-                        )
-                        for (p in pts) {
-                            drawCircle(Color(0xFF33691E), r * 0.30f, p)
-                            drawCircle(Color.White.copy(alpha = 0.45f), r * 0.10f, Offset(p.x - r * 0.09f, p.y - r * 0.10f))
-                        }
-                        val head = Offset(size.width * 0.72f, size.height * 0.38f)
-                        drawCircle(Color(0xFF2E7D32), r * 0.36f, head)
-                        drawCircle(Color.White.copy(alpha = 0.5f), r * 0.11f, Offset(head.x - r * 0.11f, head.y - r * 0.13f))
-                        drawCircle(Color.White, r * 0.09f, Offset(head.x + r * 0.10f, head.y - r * 0.06f))
-                        drawCircle(Color.Black, r * 0.05f, Offset(head.x + r * 0.12f, head.y - r * 0.06f))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Snake Game", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Nokia wali game - 3D style, fruits ke sath",
-                            color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp
-                        )
-                    }
-                    Box(
-                        modifier = Modifier.clip(RoundedCornerShape(50))
-                            .background(Color.White)
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text("PLAY", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    }
+                    Text("PLAY", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 19.sp)
                 }
+                Spacer(Modifier.height(8.dp))
             }
         }
-        if (tasks.isEmpty()) {
-            item {
-                Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) {
-                    Text("No tasks yet. Tap + Add in the bar below.", color = Color.Gray)
-                }
-            }
-        } else {
-            items(tasks, key = { it.id }) { task ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = task.done,
-                            onCheckedChange = { checked ->
-                                val idx = tasks.indexOf(task)
-                                if (idx >= 0) tasks[idx] = task.copy(done = checked)
-                            },
-                            colors = CheckboxDefaults.colors(checkedColor = BluePrimary)
-                        )
-                        Text(
-                            task.title, modifier = Modifier.weight(1f), fontSize = 15.sp,
-                            color = if (task.done) Color.Gray else Color(0xFF1C2333),
-                            textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
-                        )
-                        IconButton(onClick = { tasks.remove(task) }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFE35D6A))
-                        }
-                    }
-                }
-            }
-        }
-        item {
-            Spacer(Modifier.height(14.dp))
-            Text(
-                "Version $CURRENT_VERSION_NAME" +
-                    if (updateState.phase == UpdatePhase.UP_TO_DATE) "  -  App is up to date" else "",
-                modifier = Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally),
-                color = Color.Gray, fontSize = 12.sp
-            )
-            Spacer(Modifier.height(8.dp))
-        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Version $CURRENT_VERSION_NAME" +
+                if (updateState.phase == UpdatePhase.UP_TO_DATE) "  -  App is up to date" else "",
+            modifier = Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally),
+            color = Color.Gray, fontSize = 12.sp
+        )
     }
 }
