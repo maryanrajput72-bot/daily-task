@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -45,8 +46,8 @@ import java.util.*
 
 data class TaskItem(val id: Long, val title: String, var done: Boolean = false)
 
-private const val CURRENT_VERSION_CODE = 5
-private const val CURRENT_VERSION_NAME = "1.4"
+private const val CURRENT_VERSION_CODE = 6
+private const val CURRENT_VERSION_NAME = "1.5"
 private const val VERSION_URL = "https://maryanrajput72-bot.github.io/daily-task/version.json"
 
 private val PinkBar = Color(0xFFFCE7F1)
@@ -96,6 +97,7 @@ fun AppShell() {
     var showAdd by remember { mutableStateOf(false) }
     var newText by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(0) }
+    var showSnake by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     val updateState = remember { UpdateUiState() }
 
@@ -173,19 +175,25 @@ fun AppShell() {
     Box(Modifier.fillMaxSize().background(Color(0xFFF5F7FB))) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
-                when (selectedTab) {
-                    0 -> HomeContent(tasks, updateState)
-                    4 -> SettingsPage(updateState, onCheck = { checkUpdate(auto = false) }, onUpdate = { startUpdate() })
-                    else -> PlaceholderPage(navItems[selectedTab])
+                if (showSnake) {
+                    SnakeGameScreen(onBack = { showSnake = false })
+                } else {
+                    when (selectedTab) {
+                        0 -> HomeContent(tasks, updateState, onOpenSnake = { showSnake = true })
+                        4 -> SettingsPage(updateState, onCheck = { checkUpdate(auto = false) }, onUpdate = { startUpdate() })
+                        else -> PlaceholderPage(navItems[selectedTab])
+                    }
                 }
             }
-            BouncingNavBar(
-                items = navItems,
-                selected = selectedTab,
-                onSelect = { idx ->
-                    if (idx == 2) showAdd = true else selectedTab = idx
-                }
-            )
+            if (!showSnake) {
+                BouncingNavBar(
+                    items = navItems,
+                    selected = selectedTab,
+                    onSelect = { idx ->
+                        if (idx == 2) showAdd = true else selectedTab = idx
+                    }
+                )
+            }
         }
     }
 
@@ -423,7 +431,7 @@ fun PlaceholderPage(item: NavEntry) {
 }
 
 @Composable
-fun HomeContent(tasks: MutableList<TaskItem>, updateState: UpdateUiState) {
+fun HomeContent(tasks: MutableList<TaskItem>, updateState: UpdateUiState, onOpenSnake: () -> Unit) {
     val doneCount = tasks.count { it.done }
     val today = remember { SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.ENGLISH).format(Date()) }
     val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
@@ -471,6 +479,57 @@ fun HomeContent(tasks: MutableList<TaskItem>, updateState: UpdateUiState) {
             }
             Text("My Tasks", modifier = Modifier.padding(start = 20.dp, bottom = 6.dp),
                 fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+        item {
+            // Snake Game section - pyara green card, click pe game khulti hai
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clickable { onOpenSnake() },
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(Brush.horizontalGradient(listOf(Color(0xFF43A047), Color(0xFF7CB342))))
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Chhota 3D-look sanp (gol hisse + chamak + aankh)
+                    androidx.compose.foundation.Canvas(Modifier.size(64.dp)) {
+                        val r = size.minDimension / 2f
+                        drawCircle(Color.White.copy(alpha = 0.25f), r, center)
+                        val pts = listOf(
+                            Offset(size.width * 0.28f, size.height * 0.68f),
+                            Offset(size.width * 0.42f, size.height * 0.45f),
+                            Offset(size.width * 0.58f, size.height * 0.62f)
+                        )
+                        for (p in pts) {
+                            drawCircle(Color(0xFF33691E), r * 0.30f, p)
+                            drawCircle(Color.White.copy(alpha = 0.45f), r * 0.10f, Offset(p.x - r * 0.09f, p.y - r * 0.10f))
+                        }
+                        val head = Offset(size.width * 0.72f, size.height * 0.38f)
+                        drawCircle(Color(0xFF2E7D32), r * 0.36f, head)
+                        drawCircle(Color.White.copy(alpha = 0.5f), r * 0.11f, Offset(head.x - r * 0.11f, head.y - r * 0.13f))
+                        drawCircle(Color.White, r * 0.09f, Offset(head.x + r * 0.10f, head.y - r * 0.06f))
+                        drawCircle(Color.Black, r * 0.05f, Offset(head.x + r * 0.12f, head.y - r * 0.06f))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Snake Game", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Nokia wali game - 3D style, fruits ke sath",
+                            color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier.clip(RoundedCornerShape(50))
+                            .background(Color.White)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("PLAY", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
         }
         if (tasks.isEmpty()) {
             item {
